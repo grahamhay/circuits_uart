@@ -261,7 +261,7 @@ static void handle_configuration(const char *req, int *req_index)
 
     ei_encode_tuple_header(resp, &resp_index, 2);
     ei_encode_atom(resp, &resp_index, "flow_control");
-    switch (current_config.parity) {
+    switch (current_config.flow_control) {
     default:
     case UART_FLOWCONTROL_NONE: ei_encode_atom(resp, &resp_index, "none"); break;
     case UART_FLOWCONTROL_HARDWARE: ei_encode_atom(resp, &resp_index, "hardware"); break;
@@ -768,7 +768,7 @@ int main(int argc, char *argv[])
 #ifdef __WIN32__
     sprintf(logfile, "circuits_uart-%d.log", (int) GetCurrentProcessId());
 #else
-    sprintf(logfile, "circuits_uart-%d.log", (int) getpid());
+    sprintf(logfile, "/tmp/circuits_uart-%d.log", (int) getpid());
 #endif
     FILE *fp = fopen(logfile, "w+");
     log_location = fp;

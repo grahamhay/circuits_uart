@@ -1,58 +1,38 @@
 defmodule Circuits.UART.MixProject do
   use Mix.Project
 
-  @version "1.3.0"
+  @version "1.4.1"
 
-  @description "Discover and use UARTs and serial ports in Elixir."
-
-  def project() do
+  def project do
     [
       app: :circuits_uart,
       version: @version,
       elixir: "~> 1.6",
       name: "Circuits.UART",
-      description: @description,
+      description: description(),
       package: package(),
       source_url: "https://github.com/elixir-circuits/circuits_uart",
-      docs: [extras: ["README.md"], main: "readme"],
-      build_embedded: Mix.env() == :prod,
-      start_permanent: Mix.env() == :prod,
-      deps: deps(),
-      compilers: [:elixir_make] ++ Mix.compilers(),
+      compilers: [:elixir_make | Mix.compilers()],
+      make_targets: ["all"],
+      make_clean: ["clean"],
       make_executable: make_executable(),
       make_makefile: "src/Makefile",
       make_error_message: make_error_message(),
-      make_clean: ["clean"],
-      make_env: make_env()
+      docs: [extras: ["README.md"], main: "readme"],
+      start_permanent: Mix.env() == :prod,
+      build_embedded: true,
+      deps: deps()
     ]
   end
 
-  defp make_env() do
-    case System.get_env("ERL_EI_INCLUDE_DIR") do
-      nil ->
-        %{
-          "ERL_EI_INCLUDE_DIR" => "#{:code.root_dir()}/usr/include",
-          "ERL_EI_LIBDIR" => "#{:code.root_dir()}/usr/lib"
-        }
+  def application, do: []
 
-      _ ->
-        %{}
-    end
+  defp description do
+    "Discover and use UARTs and serial ports in Elixir"
   end
 
-  def application() do
-    []
-  end
-
-  defp deps() do
-    [
-      {:elixir_make, "~> 0.4", runtime: false},
-      {:ex_doc, "~> 0.19", only: [:dev, :test], runtime: false}
-    ]
-  end
-
-  defp package() do
-    [
+  defp package do
+    %{
       files: [
         "lib",
         "src/*.[ch]",
@@ -64,13 +44,20 @@ defmodule Circuits.UART.MixProject do
         "LICENSE",
         "CHANGELOG.md"
       ],
-      maintainers: ["Frank Hunleth"],
       licenses: ["Apache-2.0"],
       links: %{"GitHub" => "https://github.com/elixir-circuits/circuits_uart"}
+    }
+  end
+
+  defp deps do
+    [
+      {:elixir_make, "~> 0.6", runtime: false},
+      {:ex_doc, "~> 0.19", only: :dev, runtime: false},
+      {:dialyxir, "~> 1.0.0-rc.4", only: :dev, runtime: false}
     ]
   end
 
-  defp make_executable() do
+  defp make_executable do
     case :os.type() do
       {:win32, _} ->
         "mingw32-make"
@@ -91,7 +78,7 @@ defmodule Circuits.UART.MixProject do
   `choco install mingw`
   """
 
-  defp make_error_message() do
+  defp make_error_message do
     case :os.type() do
       {:win32, _} -> @windows_mingw_error_msg
       _ -> :default

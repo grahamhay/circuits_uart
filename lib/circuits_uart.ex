@@ -5,12 +5,12 @@ defmodule Circuits.UART do
   # serial ports. This is the additional time added to the GenServer message passing
   # timeout so that the interprocess messaging timers don't hit before the
   # timeouts on the actual operations.
-  @genserver_timeout_slack 100
+  @genserver_timeout_slack 500
 
   # There's a timeout when interacting with the port as well. If the port
   # doesn't respond by timeout + @port_timeout_slack, then there's something
   # wrong with it.
-  @port_timeout_slack 50
+  @port_timeout_slack 400
 
   @moduledoc """
   Find and use UARTs, serial ports, and more.
@@ -247,21 +247,9 @@ defmodule Circuits.UART do
 
     * `:ebadf` - the UART is closed
   """
-  @spec write(GenServer.server(), binary | [byte], integer) :: :ok | {:error, term}
-  def write(pid, data, timeout) when is_binary(data) do
+  @spec write(GenServer.server(), iodata(), non_neg_integer()) :: :ok | {:error, term}
+  def write(pid, data, timeout \\ 5000) do
     GenServer.call(pid, {:write, data, timeout}, genserver_timeout(timeout))
-  end
-
-  def write(pid, data, timeout) when is_list(data) do
-    write(pid, :erlang.iolist_to_binary(data), timeout)
-  end
-
-  @doc """
-  Write data to the opened UART with the default timeout.
-  """
-  @spec write(GenServer.server(), binary | [byte]) :: :ok | {:error, term}
-  def write(pid, data) do
-    write(pid, data, 5000)
   end
 
   @doc """
@@ -276,7 +264,7 @@ defmodule Circuits.UART do
     * `:ebadf` - the UART is closed
     * `:einval` - the UART is in active mode
   """
-  @spec read(GenServer.server(), integer) :: {:ok, binary} | {:error, term}
+  @spec read(GenServer.server(), non_neg_integer()) :: {:ok, binary} | {:error, term}
   def read(pid, timeout \\ 5000) do
     GenServer.call(pid, {:read, timeout}, genserver_timeout(timeout))
   end
@@ -336,9 +324,18 @@ defmodule Circuits.UART do
     GenServer.call(pid, {:set_rts, value})
   end
 
+  @doc """
+  Change the controlling process that
+  receives events from an active uart.
+  """
+  @spec controlling_process(GenServer.server(), pid) :: :ok | {:error, term}
+  def controlling_process(pid, controlling_process) when is_pid(controlling_process) do
+    GenServer.call(pid, {:controlling_process, controlling_process})
+  end
+
   # gen_server callbacks
   def init([]) do
-    executable = :code.priv_dir(:circuits_uart) ++ '/circuits_uart'
+    executable = Application.app_dir(:circuits_uart, ["priv", "circuits_uart"]) |> to_charlist()
 
     port =
       Port.open({:spawn_executable, executable}, [
@@ -445,9 +442,11 @@ defmodule Circuits.UART do
     end
   end
 
-  def handle_call({:write, value, timeout}, _from, state) do
+  def handle_call({:write, data, timeout}, _from, state) do
+    bin_data = IO.iodata_to_binary(data)
+
     {:ok, framed_data, new_framing_state} =
-      apply(state.framing, :add_framing, [value, state.framing_state])
+      apply(state.framing, :add_framing, [bin_data, state.framing_state])
 
     response = call_port(state, :write, {framed_data, timeout}, port_timeout(timeout))
     new_state = %{state | framing_state: new_framing_state}
@@ -502,9 +501,9 @@ defmodule Circuits.UART do
     {:reply, response, state}
   end
 
-  def terminate(_reason, state) do
-    # IO.puts("Going to terminate: #{inspect(reason)}")
-    Port.close(state.port)
+  def handle_call({:controlling_process, pid}, _from, state) do
+    new_state = %{state | controlling_process: pid}
+    {:reply, :ok, new_state}
   end
 
   def handle_info({_, {:data, <<?n, message::binary>>}}, state) do
@@ -596,12 +595,12 @@ defmodule Circuits.UART do
   defp message_id(:pid, _name), do: self()
   defp message_id(:name, name), do: name
 
-  defp genserver_timeout(timeout) do
-    max(timeout + @genserver_timeout_slack, @genserver_timeout_slack)
+  defp genserver_timeout(timeout) when timeout >= 0 do
+    timeout + @genserver_timeout_slack
   end
 
-  defp port_timeout(timeout) do
-    max(timeout + @port_timeout_slack, @port_timeout_slack)
+  defp port_timeout(timeout) when timeout >= 0 do
+    timeout + @port_timeout_slack
   end
 
   # Stop the framing timer if active and a frame completed

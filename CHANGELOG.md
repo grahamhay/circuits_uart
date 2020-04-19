@@ -1,5 +1,37 @@
 # Changelog
 
+## v1.4.1
+
+* Bug fix
+  * Remove unneeded `terminate/2` that could crash under some situations.
+
+## v1.4.0
+
+* New Feature
+  * Add `Circuits.UART.controlling_process/2`. This assigns a new controlling
+    process Pid to a uart in similar to OTP functions like
+   `:gen_udp.controlling_process/2`. Thanks to Robin Hilliard for adding this.
+
+## v1.3.2
+
+* Bug fixes
+  * Fix incorrect switch in C that caused flow control enum to be incorrect.
+    Thanks to Lee Bannard
+
+## v1.3.1
+
+* Bug fixes
+  * Lengthen timeouts on messages sent to ports. This provides more slack time
+    on heavily loaded uniprocessor devices that were missing timeouts by ~100 ms
+    periodically.
+  * Move C object files and the port executable to under the `_build` directory.
+    This makes it easier to switch between host/target builds especially when
+    using Elixir 1.8's mix target feature.
+
+* Improvements
+  * Handle iodata on `Circuits.UART.write` in addition to binaries and
+    charlists.
+
 ## v1.3.0
 
 Rebrand to `Circuits.UART`. No features or bugs were fixed in this version. To
